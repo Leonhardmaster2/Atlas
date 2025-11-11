@@ -1,0 +1,379 @@
+
+
+# Atlas — Code TODO (Editor-Suite)
+
+## 0) Plugin & Module Setup
+
+* [ ] `Plugins/Atlas/Atlas.uplugin` mit Modulen:
+
+  * [ ] `AtlasEditor` (Type=Editor, LoadingPhase=Default)
+  * [ ] `AtlasRuntime` (Type=Runtime, LoadingPhase=Default)
+* [ ] `Source/AtlasEditor/AtlasEditor.Build.cs` Dependencies: `Core`, `CoreUObject`, `Engine`, `Slate`, `SlateCore`, `ToolMenus`, `UnrealEd`, `AssetRegistry`, `Projects`, `ContentBrowser`, `EditorSubsystem`, `Json`, `JsonUtilities`, `DeveloperSettings`, `RHI`, `RenderCore`
+* [ ] `Source/AtlasRuntime/AtlasRuntime.Build.cs` Dependencies: `Core`, `CoreUObject`, `Engine`, `Json`, `JsonUtilities`
+* [ ] Precompiled Header: `Private/AtlasEditorPCH.h`
+* [ ] Style/Icon: `Resources/Atlas_64.png`, Register in `FAtlasEditorStyle`
+
+---
+
+## 1) Settings & Config (global)
+
+* [ ] `UCLASS(Config=Editor, defaultconfig)` → `UAtlasSettings : public UDeveloperSettings`
+
+  * [ ] Properties:
+
+    * `FDirectoryPath MeshRoot = "/Game/Meshes"`
+    * `FDirectoryPath MaterialRoot = "/Game/Materials"`
+    * `FDirectoryPath TextureRoot = "/Game/Textures"`
+    * `TMap<FName, FString> NamingPrefixes` (e.g. `StaticMesh="SM_"`, `Material="M_"`, `Texture="T_"`)
+    * Thresholds: `int32 MaxTextureSize=2048`, `int32 MaxTriCount=25000`, `int64 MaxProjectSizeMB=81920`, `int64 TargetVRAMMB=2560`
+    * `bool bBlockBuildOnRed=true`
+  * [ ] Function: `static const UAtlasSettings* Get();`
+* [ ] `DefaultEditor.ini` seed values
+
+---
+
+## 2) Common Core (Editor)
+
+* [ ] `AtlasEditor/Public/AtlasTypes.h` → enums/structs
+
+  * [ ] `UENUM() EAtlasSeverity { Info, Warning, Error };`
+  * [ ] `UENUM() EAtlasMapType { BaseColor, Normal, Roughness, Metalness, AO, Height, Emissive, Unknown };`
+  * [ ] `USTRUCT() FAtlasIssue { FString AssetPath; FName Rule; EAtlasSeverity Severity; FString Message; bool bCanFix; TFunction<bool()> Fix; };`
+* [ ] `AtlasEditor/Public/IAtlasRule.h`
+
+  ```cpp
+  class IAtlasRule {
+  public:
+    virtual ~IAtlasRule() = default;
+    virtual FName GetRuleName() const = 0;
+    virtual void Validate(const UObject* Asset, TArray<FAtlasIssue>& OutIssues) = 0;
+  };
+  ```
+* [ ] `AtlasEditor/Private/Core/AtlasRuleRegistry.h/.cpp`
+
+  * [ ] `static FAtlasRuleRegistry& Get();`
+  * [ ] `void Register(TSharedRef<IAtlasRule> Rule);`
+  * [ ] `const TArray<TSharedRef<IAtlasRule>>& All() const;`
+* [ ] `AtlasEditor/Private/Core/AtlasScanExecutor.h/.cpp`
+
+  * [ ] `void ScanAll(TArray<FAtlasIssue>& OutIssues);`
+  * [ ] `void ScanSelection(const TArray<FAssetData>& Selection, TArray<FAtlasIssue>& OutIssues);`
+* [ ] `AtlasEditor/Private/Core/AtlasAssetUtils.h/.cpp`
+
+  * [ ] `static bool MoveAsset(const FName SrcPath, const FString& DestPath);`
+  * [ ] `static bool RenameAsset(const FName AssetPath, const FString& NewName);`
+  * [ ] `static bool Reimport(UObject* Asset);`
+  * [ ] `static bool SyncToCB(const FString& Path);`
+* [ ] `AtlasEditor/Private/Core/AtlasTextureUtils.h/.cpp`
+
+  * [ ] `static EAtlasMapType DetectMapTypeByName(const FString& Name);`
+  * [ ] `static bool IsLikelyNormal(const UTexture2D*);`
+  * [ ] `static int64 EstimateVRAMBytes(const UTexture*);`
+* [ ] `AtlasEditor/Private/Core/AtlasMeshUtils.h/.cpp`
+
+  * [ ] `static int64 GetTriangleCount(const UStaticMesh*);`
+  * [ ] `static bool EnsureCollision(UStaticMesh*);`
+  * [ ] `static bool GenerateLODsIfNeeded(UStaticMesh*, int32 TargetLODs, int32 MaxTris);`
+
+---
+
+## 3) Atlas Organizer (Import Normalization)
+
+* [ ] Hook: `FEditorDelegates::OnAssetPostImport.AddStatic(&FAtlasOrganizer::OnPostImport);`
+* [ ] `AtlasEditor/Private/Organizer/AtlasOrganizer.h/.cpp`
+
+  * [ ] `static void OnPostImport(UFactory* Factory, UObject* Object);`
+  * [ ] `static void NormalizeGroup(const TArray<UObject*>& Group);`
+  * [ ] `static FString SuggestBaseName(const FString& RawName);`
+  * [ ] `static void ComputeDestPaths(const FString& Base, FString& MeshPath, FString& MatPath, FString& TexPath);`
+  * [ ] `static void ApplyNaming(UObject* Asset, const FString& Base);`
+  * [ ] `static void RelinkMaterialGraph(UMaterial* M, const TMap<EAtlasMapType, UTexture*>& TexByType);`
+* [ ] UI Prompt: `SAtlasOrganizerPrompt` (Slate)
+
+  * [ ] Props: `DetectedName`, `SuggestedBaseName`, editable `BaseName`
+  * [ ] Buttons: `[Accept] [Cancel] [Always Use This Pattern]`
+  * [ ] Result struct: `FAtlasOrganizerResult{ bool bOk; FString BaseName; }`
+* [ ] Map-Type Mapping:
+
+  * [ ] Filename regex → `EAtlasMapType`
+  * [ ] Fallback: `IsLikelyNormal`
+* [ ] Material Template:
+
+  * [ ] `/Atlas/Editor/M_MegaPBR_Master` (Editor asset or programmatic)
+  * [ ] `CreateOrFindMaterial(BaseName) → UMaterial*`
+  * [ ] Create MI: `UMaterialInstanceConstant* CreateMI(const FString& Name, UMaterial* Parent);`
+* [ ] Bulk Mode:
+
+  * [ ] Context Menu: `ContentBrowser` → `Atlas → Organize Selection`
+  * [ ] Entry: `FAtlasCBMenu::Extend()` + `UToolMenus::RegisterStartupCallback`
+
+---
+
+## 4) Atlas Validator (Rules + Autofix)
+
+* [ ] Rules (each in `Private/Rules/`):
+
+  **NamingConventionRule**
+
+  * [ ] Class: `FAtlasNamingConventionRule : public IAtlasRule`
+  * [ ] Check prefixes/path; Fix: `RenameAsset`, `MoveAsset`
+
+  **TextureCompressionRule**
+
+  * [ ] Normal → BC5; Color → BC7/Default
+  * [ ] Fix: modify `Texture->CompressionSettings`, `CompressionNone`, `SRGB`, `LODGroup`, then `PostEditChange()`, reimport if needed
+
+  **TextureMaxSizeRule**
+
+  * [ ] `Texture->GetImportedSize()` > `MaxTextureSize`
+  * [ ] Fix: set `MaxTextureSize`, `MipGenSettings`, `PostEditChange()`
+
+  **StaticMeshCollisionRule**
+
+  * [ ] `UStaticMesh::BodySetup` null or empty
+  * [ ] Fix: `EnsureCollision(…)` via `UBodySetup::CreatePhysicsMeshes()`
+
+  **StaticMeshLODRule**
+
+  * [ ] TriCount > `MaxTriCount` && LODs < N
+  * [ ] Fix: `GenerateLODsIfNeeded(…)`
+
+  **MaterialInstanceDupRule**
+
+  * [ ] Duplicate MIs with same scalar/vector/texture params
+  * [ ] Fix: consolidate to one MI; redirectors update
+
+  **AudioNormalizationRule** (stub)
+
+  * [ ] Detect high peak/rms via metadata
+  * [ ] Fix: set `CompressionQuality`/`bOverrideConcurrency` (real normalization optional)
+
+* [ ] UI Panel: `SAtlasValidatorPanel` (DockTabId=`Atlas.Validator`)
+
+  * [ ] Toolbar: `Scan All`, `Scan Selection`, `Fix Selected`, `Fix All`, filter by Severity
+  * [ ] `SListView<FAtlasIssue>` with columns: Asset, Rule, Severity, Message, FixButton
+  * [ ] `OnRowDoubleClick` → Sync CB
+
+* [ ] Menu registration: `FAtlasEditorModule::RegisterMenus()`
+
+* [ ] Hotkey: `Ctrl+Alt+V` → open tab
+
+* [ ] Build Gate:
+
+  * [ ] `IProjectManager`/`UCookCommandlet` hook (MVP: commandlet)
+  * [ ] `UCLASS()` `UAtlasValidateCommandlet` (Runtime): returns non-zero on red violations if `bBlockBuildOnRed`
+
+---
+
+## 5) Atlas Overview (Dashboard)
+
+* [ ] Data gatherer: `AtlasEditor/Private/Overview/AtlasOverviewStats.h/.cpp`
+
+  * [ ] `struct FAtlasTextureStat { FString Path; int64 VRAM; int32 MaxDim; EPixelFormat PF; };`
+  * [ ] `struct FAtlasMeshStat { FString Path; int64 Tris; int32 NumLODs; };`
+  * [ ] `struct FAtlasLevelStat { FString Path; int64 TotalBytes; };`
+  * [ ] `void CollectAll(TArray<FAtlasTextureStat>&, TArray<FAtlasMeshStat>&, TArray<FAtlasLevelStat>&, int64& OutProjectBytes, int64& OutVRAMBytes);`
+* [ ] UI: `SAtlasOverviewPanel` (DockTabId=`Atlas.Overview`)
+
+  * [ ] Top Cards: `VRAM Used / Target`, `Project Size / Target`, `Max Violations`
+  * [ ] Widgets: `TopTexturesList`, `TopMeshesList`, `LevelsBySizeList`
+  * [ ] Simple graphs (Slate): bars only (no extern libs)
+  * [ ] Buttons per row: `Open`, `Send to Validator`
+* [ ] Threshold engine: `AtlasEditor/Private/Overview/AtlasThresholds.h/.cpp`
+
+  * [ ] `EAtlasSeverity EvaluateVRAM(int64 CurrentMB, int64 TargetMB);`
+  * [ ] `EAtlasSeverity EvaluateProjectSize(int64 CurrentMB, int64 MaxMB);`
+  * [ ] `EAtlasSeverity EvaluateTextureSize(int32 MaxDim, int32 Limit);`
+* [ ] JSON Export:
+
+  * [ ] `AtlasEditor/Private/Overview/AtlasReport.h/.cpp`
+  * [ ] `struct FAtlasReport { TArray<FAtlasIssue> Issues; TArray<FAtlasTextureStat> Textures; … };`
+  * [ ] `bool WriteReport(const FString& Path, const FAtlasReport&);` (default to `Saved/Atlas/Report.json`)
+
+---
+
+## 6) Content Browser Integration
+
+* [ ] Extender: `FAtlasCBMenu::Register()`
+
+  * [ ] `Atlas → Organize Selection`
+  * [ ] `Atlas → Validate Selection`
+  * [ ] `Atlas → Send to Overview`
+* [ ] Command bindings: `FAtlasCommands` (`TCommands`)
+
+  * [ ] `OpenOverview`, `OpenValidator`, `RunOrganizerSelection`
+
+---
+
+## 7) Commandlets (CI)
+
+* [ ] `UAtlasValidateCommandlet : UCommandlet`
+
+  * [ ] Args: `-Selection=<Path1;Path2>` optional
+  * [ ] Output: `Saved/Atlas/Validate.json`
+  * [ ] ExitCode: `0 OK`, `1 Warnings`, `2 Errors`
+* [ ] `UAtlasOverviewCommandlet : UCommandlet`
+
+  * [ ] Output: `Saved/Atlas/Overview.json`
+
+---
+
+## 8) Telemetry (Optional, local only)
+
+* [ ] `AtlasRuntime/Private/AtlasTimeline.h/.cpp`
+
+  * [ ] `struct FAtlasSnapshot { FDateTime When; int64 ProjectSize; int64 VRAM; int32 NumViolations; };`
+  * [ ] `void AppendSnapshot(const FAtlasSnapshot&);`
+  * [ ] `TArray<FAtlasSnapshot> LoadHistory();`
+
+---
+
+## 9) Performance & Safety
+
+* [ ] Async scans: `Async(EAsyncExecution::ThreadPool, …)` for heavy gathers
+* [ ] Progress UI: `FScopedSlowTask` for full-scan
+* [ ] Redirectors fix after moves: `FAssetToolsModule::Get().FixupReferencers()`
+* [ ] Transaction support: `FScopedTransaction` für Fix-Ops
+* [ ] Hot-reload: guard `Fix` lambdas with weak ptrs; check `IsValid(Asset)`
+
+---
+
+## 10) Tests (Automation)
+
+* [ ] Functional tests in `AtlasEditorTests`:
+
+  * [ ] Import chaos sample → Organizer produces expected paths/names
+  * [ ] Validator catches known violations, autofix reduces count
+  * [ ] Overview computes deterministic VRAM/size rankings
+* [ ] Golden data in `Plugins/Atlas/TestContent/`
+
+---
+
+## 11) Public API (for other plugins)
+
+* [ ] `IAtlasEditorModule` interface:
+
+  * [ ] `void RegisterRule(TSharedRef<IAtlasRule>);`
+  * [ ] `void RequestScan(const TArray<FAssetData>& OptionalSelection);`
+  * [ ] `void OpenOverview();`
+* [ ] `DECLARE_MULTICAST_DELEGATE_OneParam(FOnAtlasIssuesReady, const TArray<FAtlasIssue>&);`
+
+---
+
+## 12) Console Commands (Dev)
+
+* [ ] `Atlas.ScanAll`
+* [ ] `Atlas.ValidateSelection`
+* [ ] `Atlas.OrganizeSelection`
+* [ ] `Atlas.ExportReport <Path>`
+
+---
+
+## 13) Default Rules Config (DataAsset)
+
+* [ ] `UDataAsset UAtlasRuleProfile`
+
+  * [ ] `bool bEnforceNaming=true`
+  * [ ] `bool bEnforceTextureCompression=true`
+  * [ ] `bool bEnforceMaxTextureSize=true`
+  * [ ] `bool bEnforceCollision=true`
+  * [ ] `bool bEnforceLODs=true`
+* [ ] Loadable via `UAtlasSettings::DefaultRuleProfile`
+
+---
+
+## 14) Material Graph Helpers
+
+* [ ] `AtlasEditor/Private/Material/AtlasMaterialBuilder.h/.cpp`
+
+  * [ ] `void Connect(UBlueprintMaterialEditorLibrary* Lib, UMaterial* M, const TMap<EAtlasMapType, UTexture*>&);`
+  * [ ] Parameter names: `BaseColorTex`, `NormalTex`, `RoughnessTex`, `MetalnessTex`, `AOTex`, `HeightTex`, `EmissiveTex`
+
+---
+
+## 15) Error & Log
+
+* [ ] Log category: `DEFINE_LOG_CATEGORY(LogAtlas);`
+* [ ] `UE_LOG(LogAtlas, Warning, TEXT("…"));`
+* [ ] Issue formatting helper: `FString MakeIssueMsg(const UObject*, const TCHAR* Fmt, …);`
+
+---
+
+## 16) UI IDs & Registration
+
+* [ ] Tab IDs: `Atlas.Overview`, `Atlas.Validator`
+* [ ] Menu section: `/Script/AtlasEditor.MainMenu`
+* [ ] Command context name: `AtlasEditor`
+* [ ] Style set name: `AtlasStyle`
+
+---
+
+## 17) Minimal Assets (Editor Content)
+
+* [ ] `/Atlas/Editor/M_MegaPBR_Master`
+* [ ] `/Atlas/Editor/T_Placeholder_64`
+* [ ] `/Atlas/Editor/AtlasStyle.json` (optional)
+
+---
+
+## 18) Roadmap Hooks
+
+* [ ] Perforce aware rename queue (interface only)
+* [ ] Project-wide shader unification audit (stub)
+* [ ] Audio real normalization via offline processor (stub)
+
+---
+
+## 19) Build Integration
+
+* [ ] `PreBuildStep` sample (CI): run `UAtlasValidateCommandlet` and fail job on exit code `2`
+* [ ] Artifact: attach `Validate.json` + `Overview.json`
+
+---
+
+## 20) Versioning & Migration
+
+* [ ] `IPluginManager` version bump handler
+* [ ] `UFUNCTION(CallInEditor)` migration: re-write legacy paths to configured roots
+
+---
+Summary 
+
+Atlas is a content governance and automation toolkit for Unreal Engine.
+It standardizes, cleans, verifies, and monitors all project assets to prevent pipeline chaos and performance waste.
+
+It consists of three integrated systems:
+
+Atlas Organizer
+Automatically restructures imported asset packs (meshes, materials, textures) into a clean, consistent project layout.
+It detects the base asset name, renames files to studio naming conventions, moves them into the correct folders, and builds/links a proper PBR material setup.
+
+Atlas Validator
+Continuously enforces project rules.
+It checks all assets for correct naming, texture compression, max texture size, mesh LOD presence, collision settings, and material duplication — and can auto-fix issues with one click.
+
+Atlas Overview
+A dashboard that measures and visualizes total project cost:
+
+VRAM usage by textures
+
+Triangle counts and LOD quality
+
+Project size growth and asset footprint
+
+Memory/complexity thresholds with warnings and build-blocking options
+
+Core Benefit
+Atlas prevents Unreal projects from rotting over time by ensuring assets remain:
+
+correctly named
+
+properly imported
+
+structurally organized
+
+memory-efficient
+
+build-safe
+
+It turns the editor into a self-cleaning ecosystem where content remains consistent, scalable, and performance-stable — even as many people contribute to it.
