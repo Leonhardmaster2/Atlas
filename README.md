@@ -49,10 +49,12 @@ A dashboard that measures and visualizes total project cost:
 - **AtlasTextureUtils**: Texture analysis (map type detection, VRAM estimation, compression validation)
 - **AtlasMeshUtils**: Mesh operations (triangle counting, collision checking/generation, LOD management)
 
-#### Validation Rules (Examples Implemented)
+#### Validation Rules (5 Implemented)
 1. **Naming Convention Rule**: Validates asset naming prefixes and paths
 2. **Texture Compression Rule**: Ensures textures use appropriate compression (BC5 for normals, BC7 for color, etc.)
-3. **Static Mesh Collision Rule**: Verifies meshes have collision geometry
+3. **Texture Size Rule**: Validates textures don't exceed maximum dimensions
+4. **Static Mesh Collision Rule**: Verifies meshes have collision geometry
+5. **Static Mesh LOD Rule**: Ensures high-poly meshes have appropriate LODs
 
 All rules support auto-fix functionality.
 
@@ -65,18 +67,44 @@ All rules support auto-fix functionality.
 #### Configuration
 - **DefaultEditor.ini**: Pre-configured with sensible defaults for all settings
 
-### 🚧 Pending Components (From Original TODO)
+#### Atlas Organizer System
+- **FAtlasOrganizer**: Automatic asset organization on import
+- **Import Hook**: Integrates with `FEditorDelegates::OnAssetPostImport`
+- **Asset Grouping**: Groups related assets (meshes, textures, materials) by base name
+- **Auto-Naming**: Applies naming conventions automatically
+- **Folder Organization**: Moves assets to appropriate folders
+- **Material Relinking**: Links textures to materials based on PBR map types
 
-The following systems are defined in the TODO but not yet implemented:
-- Atlas Organizer (import hook and normalization)
-- Complete Validator and Overview UI panels
-- Additional validation rules (texture size, mesh LODs, material duplication, audio)
+#### Atlas Validator UI
+- **SAtlasValidatorPanel**: Full Slate UI panel for validation
+- **Issue List**: Displays all found issues with severity, rule, asset, and message
+- **Interactive Fixing**: Click "Fix" button on individual issues or fix all at once
+- **Filtering**: Filter by severity (Info, Warning, Error)
+- **Content Browser Sync**: Double-click an issue to sync to Content Browser
+
+#### Atlas Overview Dashboard
+- **SAtlasOverviewPanel**: Complete dashboard with project statistics
+- **VRAM Tracking**: Shows current VRAM usage vs target with color-coded status
+- **Project Size Tracking**: Displays project size vs maximum allowed
+- **Top Textures List**: Shows top 20 textures by VRAM usage
+- **Top Meshes List**: Shows top 20 meshes by triangle count
+- **FAtlasOverviewStats**: Comprehensive stats collection system
+
+#### Commandlets & Automation
+- **UAtlasValidateCommandlet**: CI/CD integration for automated validation
+- **Console Commands**:
+  - `Atlas.ScanAll` - Scan all assets
+  - `Atlas.ValidateSelection` - Validate selected assets
+  - `Atlas.OrganizeSelection` - Organize selected assets
+  - `Atlas.ExportReport` - Export validation report
+
+### 🚧 Optional/Future Components
+
+The following are nice-to-have features for future enhancement:
 - Content Browser context menu integration
-- Commandlets for CI/CD
-- Console commands
-- Telemetry system
-- Material graph helpers
-- Atlas Timeline for historical tracking
+- Telemetry and timeline tracking
+- Material graph visual automation
+- Additional validation rules (material duplication detection, audio normalization)
 
 ## Project Structure
 

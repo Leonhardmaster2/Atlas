@@ -3,8 +3,12 @@
 #include "AtlasEditor.h"
 #include "AtlasEditorStyle.h"
 #include "AtlasCommands.h"
+#include "AtlasConsoleCommands.h"
 #include "Core/AtlasRuleRegistry.h"
 #include "Core/AtlasRuleInitializer.h"
+#include "Organizer/AtlasOrganizer.h"
+#include "Widgets/SAtlasOverviewPanel.h"
+#include "Widgets/SAtlasValidatorPanel.h"
 #include "IAtlasRule.h"
 #include "Misc/MessageDialog.h"
 #include "ToolMenus.h"
@@ -31,6 +35,12 @@ void FAtlasEditorModule::StartupModule()
 	// Register validation rules
 	FAtlasRuleInitializer::RegisterDefaultRules();
 
+	// Initialize Atlas Organizer
+	FAtlasOrganizer::Initialize();
+
+	// Register console commands
+	FAtlasConsoleCommands::Register();
+
 	// Register UI extensions
 	UToolMenus::RegisterStartupCallback(FSimpleMulticastDelegate::FDelegate::CreateRaw(this, &FAtlasEditorModule::RegisterMenus));
 
@@ -42,6 +52,12 @@ void FAtlasEditorModule::StartupModule()
 
 void FAtlasEditorModule::ShutdownModule()
 {
+	// Shutdown Atlas Organizer
+	FAtlasOrganizer::Shutdown();
+
+	// Unregister console commands
+	FAtlasConsoleCommands::Unregister();
+
 	// Unregister all the asset types that we registered
 	UToolMenus::UnRegisterStartupCallback(this);
 	UToolMenus::UnregisterOwner(this);
@@ -113,33 +129,19 @@ void FAtlasEditorModule::RegisterMenus()
 
 TSharedRef<SDockTab> FAtlasEditorModule::OnSpawnOverviewTab(const FSpawnTabArgs& SpawnTabArgs)
 {
-	// TODO: Implement overview panel
 	return SNew(SDockTab)
 		.TabRole(ETabRole::NomadTab)
 		[
-			SNew(SVerticalBox)
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			[
-				SNew(STextBlock)
-				.Text(LOCTEXT("OverviewPlaceholder", "Atlas Overview Dashboard - Coming Soon"))
-			]
+			SNew(SAtlasOverviewPanel)
 		];
 }
 
 TSharedRef<SDockTab> FAtlasEditorModule::OnSpawnValidatorTab(const FSpawnTabArgs& SpawnTabArgs)
 {
-	// TODO: Implement validator panel
 	return SNew(SDockTab)
 		.TabRole(ETabRole::NomadTab)
 		[
-			SNew(SVerticalBox)
-			+ SVerticalBox::Slot()
-			.AutoHeight()
-			[
-				SNew(STextBlock)
-				.Text(LOCTEXT("ValidatorPlaceholder", "Atlas Validator Panel - Coming Soon"))
-			]
+			SNew(SAtlasValidatorPanel)
 		];
 }
 

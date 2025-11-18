@@ -6,6 +6,8 @@
 #include "Rules/AtlasNamingConventionRule.h"
 #include "Rules/AtlasTextureCompressionRule.h"
 #include "Rules/AtlasStaticMeshCollisionRule.h"
+#include "Rules/AtlasTextureSizeRule.h"
+#include "Rules/AtlasStaticMeshLODRule.h"
 
 void FAtlasRuleInitializer::RegisterDefaultRules()
 {
@@ -16,17 +18,13 @@ void FAtlasRuleInitializer::RegisterDefaultRules()
 	// Register Naming Convention Rule
 	Registry.Register(MakeShared<FAtlasNamingConventionRule>());
 
-	// Register Texture Compression Rule
+	// Register Texture Rules
 	Registry.Register(MakeShared<FAtlasTextureCompressionRule>());
+	Registry.Register(MakeShared<FAtlasTextureSizeRule>());
 
-	// Register Static Mesh Collision Rule
+	// Register Mesh Rules
 	Registry.Register(MakeShared<FAtlasStaticMeshCollisionRule>());
-
-	// Additional rules can be registered here following the same pattern
-	// Registry.Register(MakeShared<FAtlasTextureSizeRule>());
-	// Registry.Register(MakeShared<FAtlasStaticMeshLODRule>());
-	// Registry.Register(MakeShared<FAtlasMaterialInstanceDupRule>());
-	// etc.
+	Registry.Register(MakeShared<FAtlasStaticMeshLODRule>());
 
 	UE_LOG(LogAtlas, Log, TEXT("Registered %d validation rules"), Registry.All().Num());
 }
